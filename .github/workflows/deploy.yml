@@ -69,4 +69,3 @@ jobs:
 
             # 5️⃣ Reiniciar el servicio Tomcat para cargar el nuevo archivo .war.
             sudo systemctl restart tomcat10
-
