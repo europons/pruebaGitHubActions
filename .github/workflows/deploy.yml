@@ -8,6 +8,10 @@ on:
 jobs:
   build-and-deploy: # Define trabajo llamado buildanddeploy
     runs-on: ubuntu-latest # El trabajo se ejecuta en Ubuntu
+    env:
+    DB_ENDPOINT: ${{ secrets.DB_ENDPOINT }}
+    DB_USERNAME: ${{ secrets.DB_USERNAME }}
+    DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
 
     steps:
       # 1️⃣ Descargar el código fuente del repositorio
@@ -36,8 +40,8 @@ jobs:
           target: /home/ubuntu/ # Carpeta destino en EC2
           strip_components: 1 # Elimina directorios
 
-      # 5️⃣ Mover el archivo .war a la carpeta webapps de Tomcat y configurar permisos
-      - name: Move .war to Tomcat directory and set permissions
+      # 5️⃣ Configurar variables de entorno y desplegar la aplicación en Tomcat.
+      - name: Configure environment variables and deploy
         uses: appleboy/ssh-action@master # Acción ssh-action
         with:
           host: ${{ secrets.EC2_HOST }} # Dirección IP de la instancia EC2
@@ -48,7 +52,21 @@ jobs:
           # Cambiar los permisos del archivo para que sea ejecutable.
           # Reiniciar el servicio Tomcat para cargar el nuevo archivo .war.
           script: |
-              sudo mv /home/ubuntu/demo-0.0.1-SNAPSHOT.war /var/lib/tomcat10/webapps/demo.war
-              sudo chown tomcat:tomcat /var/lib/tomcat10/webapps/demo.war
-              sudo chmod 755 /var/lib/tomcat10/webapps/demo.war
-              sudo systemctl restart tomcat10
+            # 1️⃣ Configurar variables de entorno en el archivo /etc/environment para persistencia.
+            echo "export DB_ENDPOINT=${{ secrets.DB_ENDPOINT }}" | sudo tee -a /etc/environment
+            echo "export DB_USERNAME=${{ secrets.DB_USERNAME }}" | sudo tee -a /etc/environment
+            echo "export DB_PASSWORD=${{ secrets.DB_PASSWORD }}" | sudo tee -a /etc/environment
+            
+            # 2️⃣ Recargar las variables de entorno en la sesión actual.
+            source /etc/environment
+
+            # 3️⃣ Mover el archivo .war a la carpeta de despliegue de Tomcat.
+            sudo mv /home/ubuntu/demo-0.0.1-SNAPSHOT.war /var/lib/tomcat10/webapps/demo.war  
+
+            # 4️⃣ Cambiar el propietario y permisos del archivo para que Tomcat pueda acceder.
+            sudo chown tomcat:tomcat /var/lib/tomcat10/webapps/demo.war  
+            sudo chmod 755 /var/lib/tomcat10/webapps/demo.war 
+
+            # 5️⃣ Reiniciar el servicio Tomcat para cargar el nuevo archivo .war.
+            sudo systemctl restart tomcat10
+
