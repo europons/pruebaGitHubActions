@@ -52,20 +52,23 @@ jobs:
           # Cambiar los permisos del archivo para que sea ejecutable.
           # Reiniciar el servicio Tomcat para cargar el nuevo archivo .war.
           script: |
-            # 1️⃣ Configurar variables de entorno en el archivo /etc/environment para persistencia.
-            echo "DB_ENDPOINT=${{ secrets.DB_ENDPOINT }}" | sudo tee -a /etc/environment
-            echo "DB_USERNAME=${{ secrets.DB_USERNAME }}" | sudo tee -a /etc/environment
-            echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" | sudo tee -a /etc/environment
-            
-            # 2️⃣ Recargar las variables de entorno en la sesión actual.
-            source /etc/environment
-
-            # 3️⃣ Mover el archivo .war a la carpeta de despliegue de Tomcat.
-            sudo mv /home/ubuntu/demo-0.0.1-SNAPSHOT.war /var/lib/tomcat10/webapps/demo.war  
-
-            # 4️⃣ Cambiar el propietario y permisos del archivo para que Tomcat pueda acceder.
-            sudo chown tomcat:tomcat /var/lib/tomcat10/webapps/demo.war  
-            sudo chmod 755 /var/lib/tomcat10/webapps/demo.war 
-
-            # 5️⃣ Reiniciar el servicio Tomcat para cargar el nuevo archivo .war.
+            # Crear override de systemd para Tomcat con variables de entorno
+            sudo mkdir -p /etc/systemd/system/tomcat10.service.d
+          
+            sudo tee /etc/systemd/system/tomcat10.service.d/override.conf > /dev/null <<EOF
+            [Service]
+            Environment="DB_ENDPOINT=${{ secrets.DB_ENDPOINT }}"
+            Environment="DB_USERNAME=${{ secrets.DB_USERNAME }}"
+            Environment="DB_PASSWORD=${{ secrets.DB_PASSWORD }}"
+            EOF
+          
+            # Recargar systemd para que lea el override
+            sudo systemctl daemon-reload
+          
+            # Mover el .war y permisos
+            sudo mv /home/ubuntu/demo-0.0.1-SNAPSHOT.war /var/lib/tomcat10/webapps/demo.war
+            sudo chown tomcat:tomcat /var/lib/tomcat10/webapps/demo.war
+            sudo chmod 755 /var/lib/tomcat10/webapps/demo.war
+          
+            # Reiniciar Tomcat
             sudo systemctl restart tomcat10
